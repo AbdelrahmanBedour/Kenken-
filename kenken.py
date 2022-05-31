@@ -136,3 +136,103 @@ def gneighbors(cliques):
                     neighbors[B].append(A)
 
     return neighbors
+
+
+
+def operation(operator):
+
+    if operator == '+':
+        return lambda a, b: a + b
+    elif operator == '-':
+        return lambda a, b: a - b
+    elif operator == '*':
+        return lambda a, b: a * b
+    elif operator == '/':
+        return lambda a, b: a / b
+    else:
+        return None
+
+
+class Kenken(csp.CSP):
+
+    def __init__(self, size, cliques):
+
+        
+        variables = [members for members, _, _ in cliques]
+        
+        domains = gdomains(size, cliques)
+
+        neighbors = gneighbors(cliques)
+
+        csp.CSP.__init__(self, variables, domains, neighbors, self.constraint)
+
+        self.size = size
+
+        self.checks = 0
+
+    def constraint(self, A, a, B, b):
+        self.checks += 1
+        return A == B or not conflicting(A, a, B, b)
+
+
+def benchmarking(kenken, algorithm):
+
+        kenken.checks = kenken.nassigns = 0
+
+        dt = time()
+
+        assignment = algorithm(kenken)
+
+        dt = time() - dt
+
+        return assignment, (kenken.checks, kenken.nassigns, dt)
+
+def wrap_up(iterations, out):
+
+    bt         = lambda ken: csp.backtracking_search(ken)
+    
+    fc         = lambda ken: csp.backtracking_search(ken, inference=csp.forward_checking)
+    
+    fcmac        = lambda ken: csp.backtracking_search(ken, inference=csp.arc_consistency)
+    
+
+    algorithms = {
+        "BackTrack": bt,
+        
+        "ForwadChecking": fc,
+        
+        "ArcConsistency": fcmac
+        
+    }
+
+    with open(out, "w+",newline='') as file:
+
+        out = writer(file)
+
+        out.writerow(["Algorithm", "Size", "Constraint checks", "Assignments", "Completion time","result","iteration"])
+
+        results = {
+            "BackTrack": [0, 0, 0],
+
+            "ForwadChecking": [0, 0, 0],
+
+            "ForwadChecking&Arc ": [0, 0, 0]
+        }
+
+        for i in range(iterations):
+            size = np.random.choice(range(3, 8))
+            size, batches = generate(size)
+
+            for name, algorithm in algorithms.items():
+                assignment, data = benchmarking(Kenken(size, batches), algorithm)
+                print("algorithm =", name, "size =", size, "iteration =", i, "result =",
+                      "Success" if assignment else "Failure", "time =", data[2], file=stderr)
+                results[name][0]+=data[0]
+                results[name][1] += data[1]
+                results[name][2] += data[2]
+                out.writerow([name, size, data[0], data[1], data[2],"Success" if assignment else "Failure",i+1])
+        for name, algorithm in algorithms.items():
+            out.writerow([name, 0, results[name][0], results[name][1], results[name][2]])
+if __name__ == "__main__":
+    wrap_up(100,'analysis.csv')
+
